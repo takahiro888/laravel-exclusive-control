@@ -1,0 +1,67 @@
+# =============================================================================
+# 排他制御検証アプリ用 Docker Compose 定義
+#
+# 構成:
+#   web (Nginx)  -> app (PHP-FPM / Laravel) -> db (MySQL 8.0)
+#
+# なぜ Nginx と PHP-FPM を分けるのか:
+#   本番に近い構成にしておくことで「複数リクエストが並行して PHP-FPM の
+#   別プロセスで処理される」状態を再現できる。排他制御の検証では
+#   同時リクエストが本当に並行処理されることが重要なため、
+#   シングルプロセスの `php artisan serve` は使わない。
+# =============================================================================
+services:
+  app:
+    build:
+      context: ./docker/php
+      args:
+        # ホストのユーザーと UID/GID を合わせ、src/ 配下のファイル所有者が
+        # root にならないようにする（Mac の Docker Desktop では実害は少ないが Linux 対策）
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    container_name: ec-app
+    volumes:
+      - ./src:/var/www/html
+    depends_on:
+      db:
+        # MySQL は起動直後すぐには接続を受け付けないため、
+        # healthcheck が通るまで app の起動を待つ
+        condition: service_healthy
+
+  web:
+    image: nginx:1.27-alpine
+    container_name: ec-web
+    ports:
+      - "8080:80"
+    volumes:
+      - ./src:/var/www/html
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+
+  db:
+    image: mysql:8.0
+    container_name: ec-db
+    ports:
+      # ホストから TablePlus / mysql クライアント等で直接接続して
+      # ロック状態 (performance_schema.data_locks 等) を観察できるよう公開する
+      - "33060:3306"
+    environment:
+      MYSQL_DATABASE: laravel
+      MYSQL_USER: laravel
+      MYSQL_PASSWORD: secret
+      MYSQL_ROOT_PASSWORD: root
+      TZ: Asia/Tokyo
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf:ro
+      # /docker-entrypoint-initdb.d の SQL は「ボリュームが空の初回起動時」だけ実行される
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  db-data:
