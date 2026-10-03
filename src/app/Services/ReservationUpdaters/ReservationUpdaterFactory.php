@@ -16,6 +16,7 @@ class ReservationUpdaterFactory
         return match ($mode) {
             LockMode::None => new NoLockUpdater(),
             LockMode::UpdatedAt => new UpdatedAtLockUpdater(),
+            LockMode::Version => new VersionLockUpdater(),
             default => throw new LogicException("{$mode->label()} は Phase {$mode->phase()} で実装予定です。"),
         };
     }

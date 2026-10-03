@@ -80,7 +80,7 @@ class ReservationController extends Controller
         }
 
         // 編集画面を開いた時点の値（hidden）。どの値を使うかは方式ごとの Updater が決める。
-        $context = $request->only(['original_updated_at']);
+        $context = $request->only(['original_updated_at', 'original_version']);
 
         try {
             $updaterFactory->make($mode)->update($reservation, $request->validated(), $context);

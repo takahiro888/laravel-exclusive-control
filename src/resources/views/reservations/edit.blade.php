@@ -7,6 +7,7 @@
 
     {{-- hidden 項目（編集開始時の値）の検証エラー。フォームの入力欄が無いのでここにまとめて出す --}}
     @error('original_updated_at') <div class="flash flash-error">{{ $message }}</div> @enderror
+    @error('original_version') <div class="flash flash-error">{{ $message }}</div> @enderror
 
     {{--
         編集画面を開いた時点の値。
@@ -71,6 +72,14 @@
                 old() を使うと、競合で戻ってきたときに「古い updated_at」が復元され、何度保存しても競合し続ける。
             --}}
             <input type="hidden" name="original_updated_at" value="{{ $reservation->updated_at->format('Y-m-d H:i:s') }}">
+        @endif
+
+        @if ($lockMode === \App\Enums\LockMode::Version)
+            {{--
+                version 方式: 編集画面を開いた時点の version を送り返す。
+                updated_at 方式と同じく、old() ではなく必ず DB の値を出す。
+            --}}
+            <input type="hidden" name="original_version" value="{{ $reservation->version }}">
         @endif
         <p class="muted" style="margin-top: 0;">この画面は「{{ $lockMode->label() }}」で開きました。保存時もこの方式で処理されます。</p>
         @include('reservations._form')
