@@ -62,7 +62,7 @@ enum LockMode: string
     public function implemented(): bool
     {
         return match ($this) {
-            self::None => true,
+            self::None, self::UpdatedAt => true,
             default => false,
         };
     }

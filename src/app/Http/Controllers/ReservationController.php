@@ -79,14 +79,19 @@ class ReservationController extends Controller
                 ->with('error', "編集中に排他制御方式が「{$mode->label()}」に変更されました。内容を確認して、もう一度保存してください。");
         }
 
+        // 編集画面を開いた時点の値（hidden）。どの値を使うかは方式ごとの Updater が決める。
+        $context = $request->only(['original_updated_at']);
+
         try {
-            $updaterFactory->make($mode)->update($reservation, $request->validated());
+            $updaterFactory->make($mode)->update($reservation, $request->validated(), $context);
         } catch (ReservationConflictException $e) {
-            // Phase 4 以降: 競合を検知した場合は、入力内容を残したまま編集画面に戻す
+            // 競合を検知した場合は、入力内容を残したまま編集画面に戻す。
+            // conflict フラグを渡し、編集画面で「最新の内容」と「あなたの入力」を見比べられるようにする。
             return redirect()
                 ->route('reservations.edit', $reservation)
                 ->withInput()
-                ->with('error', $e->getMessage());
+                ->with('error', $e->getMessage())
+                ->with('conflict', true);
         }
 
         return redirect()

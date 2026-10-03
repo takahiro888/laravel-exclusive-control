@@ -61,6 +61,11 @@ return [
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                // UPDATE の戻り値を「値が実際に変わった行数」ではなく「WHERE に一致した行数」にする。
+                // 楽観的ロックは「0件なら競合」と判定するため、デフォルトのままだと
+                // 「誰も更新していないのに、変更なしで保存すると競合になる」誤検知が起きる
+                // （docs/phase4-updated-at.md で再現）。
+                Mysql::ATTR_FOUND_ROWS => true,
             ]) : [],
         ],
 
