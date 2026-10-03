@@ -3,8 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Enums\ReservationStatus;
+use App\Exceptions\ReservationConflictException;
 use App\Http\Requests\ReservationRequest;
 use App\Models\Reservation;
+use App\Services\LockModeSetting;
+use App\Services\ReservationUpdaters\ReservationUpdaterFactory;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -41,36 +44,54 @@ class ReservationController extends Controller
             ->with('success', '予約を登録しました。');
     }
 
-    public function edit(Reservation $reservation): View
+    public function edit(Reservation $reservation, LockModeSetting $lockModeSetting): View
     {
         return view('reservations.edit', [
             'reservation' => $reservation,
             'statuses' => ReservationStatus::cases(),
+            // 編集画面を開いた時点の方式。hidden で送り返し、更新時に変わっていないか確認する
+            'lockMode' => $lockModeSetting->current(),
         ]);
     }
 
     /**
-     * 予約の更新（排他制御なし）
+     * 予約の更新
      *
-     * ここが Phase 3 以降の比較の基準になる「何もしていない」更新処理。
-     *
-     * 処理の流れと発行される SQL のイメージ:
-     *   1. ルートモデルバインディングで最新の行を取得
-     *        select * from reservations where id = 1 limit 1
-     *   2. フォームの値で上書きして保存（Eloquent は変更されたカラムだけを UPDATE する）
-     *        update reservations set number_of_people = 4, updated_at = '...' where id = 1
-     *
-     * WHERE 句が id だけなので、「編集画面を開いた後に他の人が更新したかどうか」は一切確認しない。
-     * フォームには編集画面を開いた時点の値がすべて入っているため、
-     * 後から保存した人の古い値で、先に保存した人の変更が上書きされる（Lost Update）。
+     * 実際の更新処理は、選択中の排他制御方式に対応する ReservationUpdater に任せる。
+     * コントローラの役割は「方式を選ぶ」「競合したら画面にメッセージを返す」ことだけにして、
+     * 方式ごとの違いを Updater クラスに閉じ込めている。
      */
-    public function update(ReservationRequest $request, Reservation $reservation): RedirectResponse
-    {
-        $reservation->update($request->validated());
+    public function update(
+        ReservationRequest $request,
+        Reservation $reservation,
+        LockModeSetting $lockModeSetting,
+        ReservationUpdaterFactory $updaterFactory,
+    ): RedirectResponse {
+        $mode = $lockModeSetting->current();
+
+        // 編集画面を開いた後に方式が切り替えられていたら、更新させない。
+        // 例えば「なし」で開いたフォームには version の hidden が無いので、
+        // そのまま version 方式で処理すると正しく判定できないため。
+        if ($request->input('lock_mode') !== $mode->value) {
+            return redirect()
+                ->route('reservations.edit', $reservation)
+                ->withInput()
+                ->with('error', "編集中に排他制御方式が「{$mode->label()}」に変更されました。内容を確認して、もう一度保存してください。");
+        }
+
+        try {
+            $updaterFactory->make($mode)->update($reservation, $request->validated());
+        } catch (ReservationConflictException $e) {
+            // Phase 4 以降: 競合を検知した場合は、入力内容を残したまま編集画面に戻す
+            return redirect()
+                ->route('reservations.edit', $reservation)
+                ->withInput()
+                ->with('error', $e->getMessage());
+        }
 
         return redirect()
             ->route('reservations.show', $reservation)
-            ->with('success', '予約を更新しました。');
+            ->with('success', "予約を更新しました（{$mode->label()}）。");
     }
 
     public function destroy(Reservation $reservation): RedirectResponse

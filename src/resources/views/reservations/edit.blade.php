@@ -18,6 +18,12 @@
     <form method="POST" action="{{ route('reservations.update', $reservation) }}" class="card">
         @csrf
         @method('PUT')
+        {{--
+            編集画面を開いた時点の排他制御方式。
+            保存時に現在の方式と比べ、途中で切り替えられていたら更新を止める。
+        --}}
+        <input type="hidden" name="lock_mode" value="{{ $lockMode->value }}">
+        <p class="muted" style="margin-top: 0;">この画面は「{{ $lockMode->label() }}」で開きました。保存時もこの方式で処理されます。</p>
         @include('reservations._form')
 
         <div class="actions">

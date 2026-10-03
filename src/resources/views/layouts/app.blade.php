@@ -42,7 +42,14 @@
         .badge-pending { background: #fef9c3; border-color: #fde047; }
         .badge-confirmed { background: #dcfce7; border-color: #86efac; }
         .badge-cancelled { background: #f3f4f6; color: var(--muted); }
-        .mode-slot { font-size: .85rem; color: var(--muted); }
+        .mode-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: .9rem; }
+        .mode-form select { padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: .9rem; max-width: 100%; }
+        .mode-banner { border-left: 4px solid var(--mode-color); background: var(--surface); padding: 10px 14px; border-radius: 6px; margin-bottom: 16px; }
+        .mode-banner strong { color: var(--mode-color); }
+        .mode-none { --mode-color: #dc2626; }
+        .mode-updated_at, .mode-version { --mode-color: #2563eb; }
+        .mode-pessimistic { --mode-color: #7c3aed; }
+        .mode-edit_lock, .mode-edit_lock_expiry { --mode-color: #d97706; }
         dl.details { display: grid; grid-template-columns: 160px 1fr; gap: 8px 16px; margin: 0; }
         dl.details dt { color: var(--muted); }
         dl.details dd { margin: 0; }
@@ -58,17 +65,43 @@
 <header>
     <div class="header-inner">
         <a href="{{ route('reservations.index') }}" class="brand">{{ config('app.name') }}</a>
-        {{-- Phase 3 で、ここに「現在の排他制御方式」の表示と切り替え UI を置く --}}
-        <div class="mode-slot">排他制御方式: 未設定（Phase 3 で追加）</div>
+        {{--
+            排他制御方式の切り替え。アプリ全体で1つの設定なので、
+            ここで切り替えると他のブラウザ・タブの操作にも反映される。
+            未実装の方式は disabled にして、実装予定の Phase を表示する。
+        --}}
+        <form method="POST" action="{{ route('lock-mode.update') }}" class="mode-form">
+            @csrf
+            @method('PUT')
+            <label for="lock_mode_switch">排他制御方式</label>
+            <select id="lock_mode_switch" name="lock_mode">
+                @foreach ($lockModes as $mode)
+                    <option value="{{ $mode->value }}"
+                        @selected($mode === $currentLockMode)
+                        @disabled(! $mode->implemented())>
+                        {{ $mode->label() }}{{ $mode->implemented() ? '' : "（Phase {$mode->phase()}）" }}
+                    </option>
+                @endforeach
+            </select>
+            <button type="submit" class="btn">切り替え</button>
+        </form>
     </div>
 </header>
 <main>
+    {{-- 現在どの方式で操作しているかを全画面の上部に表示する --}}
+    <div class="mode-banner mode-{{ $currentLockMode->value }}">
+        現在の排他制御方式: <strong>{{ $currentLockMode->label() }}</strong>
+        <div class="muted" style="font-size: .85rem;">{{ $currentLockMode->description() }}</div>
+    </div>
+
     @if (session('success'))
         <div class="flash flash-success">{{ session('success') }}</div>
     @endif
     @if (session('error'))
         <div class="flash flash-error">{{ session('error') }}</div>
     @endif
+
+    @error('lock_mode') <div class="flash flash-error">{{ $message }}</div> @enderror
 
     @yield('content')
 </main>
