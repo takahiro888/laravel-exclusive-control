@@ -158,7 +158,7 @@ docker compose exec app php artisan test
 docker compose exec app vendor/bin/phpunit --testdox   # テスト名（日本語）の一覧
 ```
 
-81 件のテストで、各方式の挙動と弱点、画面の操作とバッチの組み合わせを検証しています。
+93 件のテストで、各方式の挙動と弱点、画面の操作とバッチの組み合わせを検証しています。
 テストは手動検証用とは別のデータベース（`laravel_testing`）を使うので、画面のデータは変わりません。
 同時実行のテスト方法は [docs/phase8-testing.md](docs/phase8-testing.md) を参照してください。
 
@@ -224,7 +224,7 @@ docker compose exec app vendor/bin/phpunit --testdox   # テスト名（日本�
 | [docs/phase6-pessimistic-lock.md](docs/phase6-pessimistic-lock.md) | SELECT FOR UPDATE。ロック待ち、タイムアウト、FOR UPDATE だけでは防げない理由 |
 | [docs/phase7-edit-lock.md](docs/phase7-edit-lock.md) | 編集ロックと有効期限付き編集ロック |
 | [docs/phase8-testing.md](docs/phase8-testing.md) | 自動テストと、同時実行のテスト方法 |
-| [docs/phase10-combinations.md](docs/phase10-combinations.md) | **画面の操作 × バッチの組み合わせ**。バッチの後出しを防ぐ最善の書き方 |
+| [docs/phase10-combinations.md](docs/phase10-combinations.md) | **画面の操作 × バッチの組み合わせ**。バッチの後出しを防ぐ最善の書き方、キャンセルを覆させない 3 層の守り方 |
 
 ---
 
