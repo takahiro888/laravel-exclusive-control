@@ -15,6 +15,10 @@
 | 5 | 編集ロック | 編集画面を開いた時点でロックを取り、他の人を編集画面に入れない |
 | 6 | 有効期限付き編集ロック | 編集ロックに期限を付け、放置されたロックを他の人が奪えるようにする |
 
+さらに、**画面のキャンセル処理（楽観的ロック）と、書き方の違うバッチが同時に動いた場合** の組み合わせも検証しています。
+楽観的ロックで守っていても、バッチが後から古い前提のまま変更してしまう「後出し」を、どう防ぐのが最善かを
+[docs/phase10-combinations.md](docs/phase10-combinations.md) にまとめています。
+
 各方式の比較と検証結果は **[docs/results.md](docs/results.md)** にまとめています。
 
 ---
@@ -132,6 +136,19 @@ docker compose exec app php artisan migrate:fresh --seed
 | 編集ロック | 詳細画面の「強制解除」で、放置されたロックを外せる |
 | 有効期限付き編集ロック | 期限は検証用に 60 秒。`src/.env` の `EDIT_LOCK_TTL_SECONDS` で変更できる |
 
+### 画面の操作 × バッチの検証
+
+予約詳細画面の「この予約をキャンセルする」ボタンは、方式の切り替えとは関係なく、常に version による楽観的ロックで処理します。
+ステータスを一括で変更するバッチは、排他制御の書き方を選んで実行できます。
+
+```sh
+# 予約 1 を確定するバッチを、排他制御なしで、読み込み後に 15 秒待つ設定で実行する
+docker compose exec app php artisan reservations:change-status pending confirmed --strategy=none --id=1 --pause=15
+```
+
+バッチが待っている間に画面でキャンセルすると、バッチの「後出し」でキャンセルが確定に戻る様子を再現できます。
+`--strategy` には `none` / `state_guard` / `state_guard_version`（推奨） / `optimistic` / `pessimistic` を指定できます。
+
 ---
 
 ## テスト
@@ -141,7 +158,7 @@ docker compose exec app php artisan test
 docker compose exec app vendor/bin/phpunit --testdox   # テスト名（日本語）の一覧
 ```
 
-49 件のテストで、各方式の挙動と弱点を検証しています。
+81 件のテストで、各方式の挙動と弱点、画面の操作とバッチの組み合わせを検証しています。
 テストは手動検証用とは別のデータベース（`laravel_testing`）を使うので、画面のデータは変わりません。
 同時実行のテスト方法は [docs/phase8-testing.md](docs/phase8-testing.md) を参照してください。
 
@@ -158,18 +175,23 @@ docker compose exec app vendor/bin/phpunit --testdox   # テスト名（日本�
     ├── app/
     │   ├── Enums/
     │   │   ├── LockMode.php                # 6 つの方式の定義
-    │   │   └── ReservationStatus.php
+    │   │   ├── BatchStrategy.php           # バッチの排他制御の書き方（5 通り）
+    │   │   └── ReservationStatus.php       # ステータスと状態遷移のルール
+    │   ├── Console/Commands/ChangeReservationStatusCommand.php   # ステータス一括変更バッチ
     │   ├── Http/
     │   │   ├── Controllers/
     │   │   │   ├── ReservationController.php   # CRUD。更新は選択中の方式の Updater に任せる
     │   │   │   ├── LockModeController.php      # 方式の切り替え
     │   │   │   ├── OperatorController.php      # 操作者名の変更
-    │   │   │   └── EditLockController.php      # 編集ロックの解放・強制解除
+    │   │   │   ├── EditLockController.php      # 編集ロックの解放・強制解除
+    │   │   │   └── ReservationCancelController.php # キャンセル（楽観的ロック）
     │   │   └── Middleware/EnsureOperator.php   # 操作者名をセッションに用意
     │   ├── Models/Reservation.php
     │   └── Services/
     │       ├── LockModeSetting.php             # 現在の方式の保存・取得
     │       ├── EditLockService.php             # 編集ロックの取得・解放
+    │       ├── CancelReservation.php           # キャンセル処理（version + 状態ガード）
+    │       ├── Batch/ReservationStatusBatch.php  # バッチ本体（書き方 5 通り）
     │       └── ReservationUpdaters/            # ★ 方式ごとの更新処理
     │           ├── ReservationUpdater.php      #   共通インターフェース
     │           ├── NoLockUpdater.php           #   1. 排他制御なし
@@ -202,6 +224,7 @@ docker compose exec app vendor/bin/phpunit --testdox   # テスト名（日本�
 | [docs/phase6-pessimistic-lock.md](docs/phase6-pessimistic-lock.md) | SELECT FOR UPDATE。ロック待ち、タイムアウト、FOR UPDATE だけでは防げない理由 |
 | [docs/phase7-edit-lock.md](docs/phase7-edit-lock.md) | 編集ロックと有効期限付き編集ロック |
 | [docs/phase8-testing.md](docs/phase8-testing.md) | 自動テストと、同時実行のテスト方法 |
+| [docs/phase10-combinations.md](docs/phase10-combinations.md) | **画面の操作 × バッチの組み合わせ**。バッチの後出しを防ぐ最善の書き方 |
 
 ---
 

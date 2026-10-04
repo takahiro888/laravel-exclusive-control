@@ -3,6 +3,7 @@
 use App\Http\Controllers\EditLockController;
 use App\Http\Controllers\LockModeController;
 use App\Http\Controllers\OperatorController;
+use App\Http\Controllers\ReservationCancelController;
 use App\Http\Controllers\ReservationController;
 use Illuminate\Support\Facades\Route;
 
@@ -21,3 +22,6 @@ Route::put('operator', [OperatorController::class, 'update'])->name('operator.up
 // 編集ロックの解放（キャンセル）と強制解除
 Route::delete('reservations/{reservation}/edit-lock', [EditLockController::class, 'release'])->name('reservations.edit-lock.release');
 Route::delete('reservations/{reservation}/edit-lock/force', [EditLockController::class, 'forceRelease'])->name('reservations.edit-lock.force');
+
+// 予約のキャンセル（常に version による楽観的ロック。Phase 10 の組み合わせ検証用）
+Route::post('reservations/{reservation}/cancel', ReservationCancelController::class)->name('reservations.cancel');

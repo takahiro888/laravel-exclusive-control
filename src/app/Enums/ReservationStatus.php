@@ -23,4 +23,34 @@ enum ReservationStatus: string
             self::Cancelled => 'キャンセル',
         };
     }
+
+    /**
+     * この状態から $to へ変更してよいか（状態遷移のルール）
+     *
+     *   仮予約 ──→ 確定
+     *     │         │
+     *     └──→ キャンセル ←┘      キャンセルは終端（どこにも戻れない）
+     *
+     * 排他制御が「誰の変更を優先するか」を決めるのに対して、状態遷移のルールは
+     * 「どんな順番で処理されても、ありえない状態にならない」ことを保証する。
+     * 例えば「キャンセル済み → 確定」は、どの処理がどの順番で実行されても起きてはいけない。
+     */
+    public function canTransitionTo(self $to): bool
+    {
+        return in_array($to, match ($this) {
+            self::Pending => [self::Confirmed, self::Cancelled],
+            self::Confirmed => [self::Cancelled],
+            self::Cancelled => [],
+        }, true);
+    }
+
+    /**
+     * $to へ変更できる状態の一覧（UPDATE の WHERE status IN (...) に使う）
+     *
+     * @return list<self>
+     */
+    public static function canTransitionFrom(self $to): array
+    {
+        return array_values(array_filter(self::cases(), fn (self $from) => $from->canTransitionTo($to)));
+    }
 }

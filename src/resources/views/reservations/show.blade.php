@@ -58,6 +58,24 @@
         </dl>
     </div>
 
+    {{--
+        キャンセル操作（Phase 10）。
+        画面を開いた時点の version を送り、その間に他の人やバッチが更新していたら競合にする。
+        画面上部の「排他制御方式」とは関係なく、常に楽観的ロックで処理する。
+    --}}
+    @if ($reservation->status->canTransitionTo(\App\Enums\ReservationStatus::Cancelled))
+        <form method="POST" action="{{ route('reservations.cancel', $reservation) }}" class="card"
+              onsubmit="return confirm('この予約をキャンセルしますか？');">
+            @csrf
+            <input type="hidden" name="original_version" value="{{ $reservation->version }}">
+            <h2 class="section-title">予約のキャンセル</h2>
+            <p class="muted" style="margin-top: 0;">
+                画面を開いた時点（version = {{ $reservation->version }}）から変更されていない場合だけキャンセルします（楽観的ロック）。
+            </p>
+            <button type="submit" class="btn btn-danger">この予約をキャンセルする</button>
+        </form>
+    @endif
+
     <div class="actions">
         <a href="{{ route('reservations.edit', $reservation) }}" class="btn btn-primary">編集</a>
         <a href="{{ route('reservations.index') }}" class="btn">一覧に戻る</a>

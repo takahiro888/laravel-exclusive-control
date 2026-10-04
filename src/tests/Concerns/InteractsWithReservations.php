@@ -91,13 +91,14 @@ trait InteractsWithReservations
      */
     protected function createReservation(array $attributes = []): Reservation
     {
+        // refresh(): version など DB の初期値で入るカラムは、create() 直後のモデルには入っていないので読み直す
         return Reservation::factory()->create([
             'customer_name' => '山田 太郎',
             'number_of_people' => 2,
             'reservation_date' => '2026-12-24 19:00:00',
             'status' => ReservationStatus::Pending,
             ...$attributes,
-        ]);
+        ])->refresh();
     }
 
     private function inputValue(string $html, string $name): ?string
