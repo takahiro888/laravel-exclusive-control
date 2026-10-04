@@ -29,6 +29,7 @@ class AppServiceProvider extends ServiceProvider
             $view->with([
                 'currentLockMode' => app(LockModeSetting::class)->current(),
                 'lockModes' => LockMode::cases(),
+                'currentOperator' => session(\App\Http\Middleware\EnsureOperator::SESSION_KEY),
             ]);
         });
     }

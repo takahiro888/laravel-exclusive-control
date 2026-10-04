@@ -16,6 +16,33 @@
     </div>
 
     {{--
+        編集ロックの状態。ロックがかかっていれば強制解除ボタンを出す。
+        有効期限なしの編集ロックは、編集画面を開いたままブラウザを閉じられると永久に残るため、
+        このような救済手段が必要になる（実務では管理者だけが使える機能にする）。
+    --}}
+    @if ($reservation->locked_by)
+        <div class="card" style="border-color: #fdba74;">
+            <h2 class="section-title">編集ロック</h2>
+            <p style="margin-top: 0;">
+                @include('reservations._lock_badge')
+                さんが {{ $reservation->locked_at?->format('H:i:s') }} から編集中です。
+                @if ($reservation->locked_until)
+                    有効期限: {{ $reservation->locked_until->format('H:i:s') }}
+                    {{ $reservation->isLockExpired() ? '（期限切れのため、他の人が編集を開始できます）' : '' }}
+                @else
+                    有効期限はありません（解放されるまで他の人は編集できません）。
+                @endif
+            </p>
+            <form method="POST" action="{{ route('reservations.edit-lock.force', $reservation) }}"
+                  onsubmit="return confirm('{{ $reservation->locked_by }} さんの編集ロックを強制解除しますか？');">
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="btn">強制解除</button>
+            </form>
+        </div>
+    @endif
+
+    {{--
         排他制御用カラムの現在値。
         どの方式でどのカラムが変化するのか（しないのか）を確認するために表示している。
     --}}

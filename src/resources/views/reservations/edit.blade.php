@@ -55,6 +55,25 @@
         </div>
     @endif
 
+    {{--
+        編集ロック方式: この画面を開いた時点でロックを取得済み。
+        有効期限付きの場合は残り時間を表示する（期限を過ぎると他の人に奪われる可能性がある）。
+    --}}
+    @if ($lockMode->usesEditLock())
+        <div class="card" style="border-color: #fdba74;">
+            あなた（<strong>{{ $reservation->locked_by }}</strong>）が編集ロックを取得しました
+            （{{ $reservation->locked_at?->format('H:i:s') }}）。
+            @if ($reservation->locked_until)
+                <br>有効期限: <span class="mono">{{ $reservation->locked_until->format('H:i:s') }}</span>
+                （残り <span id="lock-remaining" class="mono"
+                    data-until="{{ $reservation->locked_until->timestamp }}">{{ max(0, (int) now()->diffInSeconds($reservation->locked_until, false)) }}</span> 秒）
+                <div class="muted" style="font-size: .85rem;">期限を過ぎると、他の人が編集を開始できるようになります。この画面を再読み込みすると期限が延長されます。</div>
+            @else
+                <div class="muted" style="font-size: .85rem;">保存するかキャンセルするまで、他の人は編集画面を開けません。キャンセルせずに画面を閉じるとロックが残ります。</div>
+            @endif
+        </div>
+    @endif
+
     {{-- HTML のフォームは GET/POST しか送れないので、@method('PUT') で PUT として扱わせる --}}
     <form method="POST" action="{{ route('reservations.update', $reservation) }}" class="card">
         @csrf
@@ -112,7 +131,39 @@
 
         <div class="actions">
             <button type="submit" class="btn btn-primary">更新する</button>
-            <a href="{{ route('reservations.show', $reservation) }}" class="btn">キャンセル</a>
+            @if ($lockMode->usesEditLock())
+                {{--
+                    キャンセル時にロックを外すため、リンクではなく下の release-form を送信する。
+                    フォームの入れ子は HTML で禁止されているので、form 属性で外のフォームを指定している。
+                --}}
+                <button type="submit" form="release-form" class="btn">キャンセル（ロック解放）</button>
+            @else
+                <a href="{{ route('reservations.show', $reservation) }}" class="btn">キャンセル</a>
+            @endif
         </div>
     </form>
+
+    @if ($lockMode->usesEditLock())
+        <form id="release-form" method="POST" action="{{ route('reservations.edit-lock.release', $reservation) }}">
+            @csrf
+            @method('DELETE')
+        </form>
+    @endif
+
+    @if ($lockMode->hasLockExpiry())
+        {{-- 残り秒数の表示を1秒ごとに減らすだけ（ロックの判定には関係しない） --}}
+        <script>
+            (() => {
+                const el = document.getElementById('lock-remaining');
+                if (!el) return;
+                const until = Number(el.dataset.until) * 1000;
+                const tick = () => {
+                    const sec = Math.max(0, Math.ceil((until - Date.now()) / 1000));
+                    el.textContent = sec;
+                    if (sec > 0) setTimeout(tick, 1000);
+                };
+                tick();
+            })();
+        </script>
+    @endif
 @endsection

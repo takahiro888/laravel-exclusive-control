@@ -62,8 +62,24 @@ enum LockMode: string
     public function implemented(): bool
     {
         return match ($this) {
-            self::None, self::UpdatedAt, self::Version, self::Pessimistic => true,
-            default => false,
+            self::None, self::UpdatedAt, self::Version, self::Pessimistic,
+            self::EditLock, self::EditLockWithExpiry => true,
         };
+    }
+
+    /**
+     * 編集画面を開いた時点でロックを取る方式か
+     */
+    public function usesEditLock(): bool
+    {
+        return in_array($this, [self::EditLock, self::EditLockWithExpiry], true);
+    }
+
+    /**
+     * 編集ロックに有効期限を付ける方式か
+     */
+    public function hasLockExpiry(): bool
+    {
+        return $this === self::EditLockWithExpiry;
     }
 }

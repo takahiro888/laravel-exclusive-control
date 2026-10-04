@@ -43,6 +43,8 @@
         .badge-confirmed { background: #dcfce7; border-color: #86efac; }
         .badge-cancelled { background: #f3f4f6; color: var(--muted); }
         .mode-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: .9rem; }
+        .lock-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .8rem; background: #ffedd5; border: 1px solid #fdba74; }
+        .lock-badge.expired { background: #f3f4f6; border-color: var(--border); color: var(--muted); text-decoration: line-through; }
         .mode-form select { padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: .9rem; max-width: 100%; }
         .mode-banner { border-left: 4px solid var(--mode-color); background: var(--surface); padding: 10px 14px; border-radius: 6px; margin-bottom: 16px; }
         .mode-banner strong { color: var(--mode-color); }
@@ -85,6 +87,19 @@
             </select>
             <button type="submit" class="btn">切り替え</button>
         </form>
+
+        {{--
+            操作者名（ブラウザのセッションごと）。編集ロックの locked_by に記録される。
+            A と B を検証するときは、別のブラウザ（またはプライベートウィンドウ）で別の名前にする。
+        --}}
+        <form method="POST" action="{{ route('operator.update') }}" class="mode-form">
+            @csrf
+            @method('PUT')
+            <label for="operator_name">操作者</label>
+            <input type="text" id="operator_name" name="operator_name" value="{{ $currentOperator }}" maxlength="50"
+                   style="width: 9em; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: .9rem;">
+            <button type="submit" class="btn">変更</button>
+        </form>
     </div>
 </header>
 <main>
@@ -102,6 +117,7 @@
     @endif
 
     @error('lock_mode') <div class="flash flash-error">{{ $message }}</div> @enderror
+    @error('operator_name') <div class="flash flash-error">{{ $message }}</div> @enderror
 
     @yield('content')
 </main>

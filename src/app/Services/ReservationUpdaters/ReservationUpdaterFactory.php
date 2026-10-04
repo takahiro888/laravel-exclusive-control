@@ -3,7 +3,6 @@
 namespace App\Services\ReservationUpdaters;
 
 use App\Enums\LockMode;
-use LogicException;
 
 /**
  * 排他制御方式に対応する更新クラスを返す。
@@ -18,7 +17,8 @@ class ReservationUpdaterFactory
             LockMode::UpdatedAt => new UpdatedAtLockUpdater(),
             LockMode::Version => new VersionLockUpdater(),
             LockMode::Pessimistic => new PessimisticLockUpdater(),
-            default => throw new LogicException("{$mode->label()} は Phase {$mode->phase()} で実装予定です。"),
+            // 保存時の処理は有効期限の有無で変わらない（期限が効くのはロック取得時）
+            LockMode::EditLock, LockMode::EditLockWithExpiry => new EditLockUpdater(),
         };
     }
 }

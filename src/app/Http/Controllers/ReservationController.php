@@ -4,11 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Enums\ReservationStatus;
 use App\Exceptions\ReservationConflictException;
+use App\Http\Middleware\EnsureOperator;
 use App\Http\Requests\ReservationRequest;
 use App\Models\Reservation;
+use App\Services\EditLockService;
 use App\Services\LockModeSetting;
 use App\Services\ReservationUpdaters\ReservationUpdaterFactory;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class ReservationController extends Controller
@@ -44,13 +47,38 @@ class ReservationController extends Controller
             ->with('success', '予約を登録しました。');
     }
 
-    public function edit(Reservation $reservation, LockModeSetting $lockModeSetting): View
-    {
+    public function edit(
+        Request $request,
+        Reservation $reservation,
+        LockModeSetting $lockModeSetting,
+        EditLockService $editLock,
+    ): View|RedirectResponse {
+        $lockMode = $lockModeSetting->current();
+        $operator = $request->session()->get(EnsureOperator::SESSION_KEY);
+
+        // -----------------------------------------------------------------
+        // 編集ロック方式: 編集画面を開く「この時点」でロックを取る。
+        // 取れなければ編集画面を表示せず、誰が編集中かを伝えて詳細画面に戻す。
+        //
+        // ※ GET リクエストで DB を更新するのは本来避けたい（ブラウザの先読みなどで意図せず実行されうる）。
+        //   実務では詳細画面に「編集を開始する」ボタン（POST）を置くことが多い。
+        //   ここでは他の方式と同じ操作で比較できるよう、編集画面を開いた時点で取得している。
+        // -----------------------------------------------------------------
+        if ($lockMode->usesEditLock()
+            && ! $editLock->acquire($reservation, $operator, $lockMode->hasLockExpiry())) {
+            $reservation->refresh();
+
+            return redirect()
+                ->route('reservations.show', $reservation)
+                ->with('error', "{$reservation->locked_by} さんが編集中のため、編集できません（{$reservation->locked_at?->format('H:i:s')} から編集中）。");
+        }
+
         return view('reservations.edit', [
-            'reservation' => $reservation,
+            // ロックを取った後の値（locked_until など）を表示するため読み直す
+            'reservation' => $reservation->refresh(),
             'statuses' => ReservationStatus::cases(),
             // 編集画面を開いた時点の方式。hidden で送り返し、更新時に変わっていないか確認する
-            'lockMode' => $lockModeSetting->current(),
+            'lockMode' => $lockMode,
         ]);
     }
 
@@ -87,10 +115,22 @@ class ReservationController extends Controller
             'hold_seconds',
             'verify_version',
         ]);
+        // 編集ロック方式で「誰が保存しようとしているか」。
+        // フォームの入力ではなくセッションから取ることで、他人の名前を送ってロックをすり抜けることを防ぐ。
+        $context['operator'] = $request->session()->get(EnsureOperator::SESSION_KEY);
 
         try {
             $updaterFactory->make($mode)->update($reservation, $request->validated(), $context);
         } catch (ReservationConflictException $e) {
+            // 編集ロック方式でロックを失った場合は、詳細画面に戻す。
+            // 編集画面に戻すと、そこでロックの取得を試みて（他の人が持っていれば）さらに詳細画面へ転送され、
+            // 「ロックが失われた」というメッセージが「○○さんが編集中」で上書きされてしまうため。
+            if ($mode->usesEditLock()) {
+                return redirect()
+                    ->route('reservations.show', $reservation)
+                    ->with('error', $e->getMessage());
+            }
+
             // 競合を検知した場合は、入力内容を残したまま編集画面に戻す。
             // conflict フラグを渡し、編集画面で「最新の内容」と「あなたの入力」を見比べられるようにする。
             return redirect()

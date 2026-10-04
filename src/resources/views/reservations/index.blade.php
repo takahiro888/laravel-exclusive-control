@@ -33,7 +33,7 @@
                     <td>{{ $reservation->reservation_date->format('Y-m-d H:i') }}</td>
                     <td>@include('reservations._status_badge', ['status' => $reservation->status])</td>
                     <td class="num mono">{{ $reservation->version }}</td>
-                    <td>{{ $reservation->locked_by ?? '-' }}</td>
+                    <td>@include('reservations._lock_badge')</td>
                     <td class="mono">{{ $reservation->updated_at->format('Y-m-d H:i:s') }}</td>
                     <td class="actions">
                         <a href="{{ route('reservations.show', $reservation) }}">詳細</a>

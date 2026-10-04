@@ -12,7 +12,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // すべての画面のリクエストで操作者名を用意する（編集ロックの locked_by に使う）
+        $middleware->web(append: [
+            \App\Http\Middleware\EnsureOperator::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

@@ -41,4 +41,17 @@ class Reservation extends Model
             'locked_until' => 'datetime',
         ];
     }
+
+    /**
+     * 有効期限付き編集ロックの期限が切れているか（画面表示用）
+     *
+     * ロックを取れるかどうかの判定は、EditLockService で MySQL の NOW() を使って行う。
+     * ここは「期限切れ」と表示するためだけに使う。
+     */
+    public function isLockExpired(): bool
+    {
+        return $this->locked_by !== null
+            && $this->locked_until !== null
+            && $this->locked_until->isPast();
+    }
 }
