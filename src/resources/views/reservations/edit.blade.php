@@ -81,6 +81,32 @@
             --}}
             <input type="hidden" name="original_version" value="{{ $reservation->version }}">
         @endif
+
+        @if ($lockMode === \App\Enums\LockMode::Pessimistic)
+            {{--
+                悲観的ロック: ロックを取った後に version を確認するため、編集開始時の version を送り返す。
+                ロックは保存リクエストの中でしか効かないので、「画面を開いてから」の変更はこの値で確認する。
+            --}}
+            <input type="hidden" name="original_version" value="{{ $reservation->version }}">
+
+            {{-- 以下は排他制御の挙動を観察するための検証用オプション（実際のアプリには不要） --}}
+            <fieldset class="form-row" style="border: 1px dashed var(--border); border-radius: 6px; padding: 10px 14px;">
+                <legend class="muted">検証用オプション</legend>
+                <label for="hold_seconds" style="font-weight: normal;">ロック取得後に待つ秒数</label>
+                <select id="hold_seconds" name="hold_seconds">
+                    <option value="0" @selected(old('hold_seconds') == 0)>0秒（待たない）</option>
+                    <option value="5" @selected(old('hold_seconds') == 5)>5秒（別タブの保存が待たされる様子を見る）</option>
+                    <option value="15" @selected(old('hold_seconds') == 15)>15秒（別タブがロック待ちタイムアウトになる）</option>
+                </select>
+                <label style="font-weight: normal; margin-top: 8px;">
+                    {{-- チェックを外すと値が送られないので、先に 0 を送っておく --}}
+                    <input type="hidden" name="verify_version" value="0">
+                    <input type="checkbox" name="verify_version" value="1" style="width: auto;"
+                        @checked(old('verify_version', '1') === '1')>
+                    ロック取得後に version を確認する（外すと FOR UPDATE だけになり、Lost Update を防げない）
+                </label>
+            </fieldset>
+        @endif
         <p class="muted" style="margin-top: 0;">この画面は「{{ $lockMode->label() }}」で開きました。保存時もこの方式で処理されます。</p>
         @include('reservations._form')
 
