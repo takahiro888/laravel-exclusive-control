@@ -23,8 +23,14 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
-        <env name="DB_CONNECTION" value="sqlite"/>
-        <env name="DB_DATABASE" value=":memory:"/>
+        <!--
+            テストでも MySQL を使う。
+            SELECT ... FOR UPDATE の行ロック、NOW() + INTERVAL、UPDATE の件数（ATTR_FOUND_ROWS）など、
+            このアプリの排他制御は MySQL の挙動に依存しているため、SQLite では正しく検証できない。
+            データベースは手動検証用の laravel とは別の laravel_testing（docker/mysql/init で作成済み）。
+        -->
+        <env name="DB_CONNECTION" value="mysql"/>
+        <env name="DB_DATABASE" value="laravel_testing"/>
         <env name="DB_URL" value=""/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
